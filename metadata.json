@@ -1,0 +1,6 @@
+{
+  "name": "LiveFlow - Enterprise Live Chat & Customer Messaging",
+  "description": "Production-ready real-time customer messaging widget, agent inbox dashboard, multi-agent management, analytics, and Supabase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
