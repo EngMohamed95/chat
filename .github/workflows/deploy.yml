@@ -38,7 +38,7 @@ jobs:
       - name: Assemble deploy package
         run: |
           mkdir release
-          cp -r dist server-dist release/
+          cp -r dist server-dist deploy/start.sh deploy/.htaccess release/
           # express is bundled into server-dist, so there is nothing to npm install.
           cat > release/package.json <<'JSON'
           {
