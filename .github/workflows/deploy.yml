@@ -2,12 +2,12 @@
 # over SSH, then restarts the Node process there.
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
-#   SSH_HOST     server hostname or IP
-#   SSH_USER     SSH username
-#   SSH_KEY      private key whose public half is in ~/.ssh/authorized_keys on the server
-#   SSH_PORT     optional, defaults to 22
-#   APP_DIR      optional, app folder relative to the SSH home, defaults to liveflow
-#   APP_PORT     optional, port the Node server listens on, defaults to 3001
+#   SSH_HOST      server hostname or IP
+#   SSH_USER      SSH username
+#   SSH_PASSWORD  SSH password
+#   SSH_PORT      optional, defaults to 22
+#   APP_DIR       optional, app folder relative to the SSH home, defaults to www/livechat
+#   APP_PORT      optional, port the Node server listens on, defaults to 3001
 # Until SSH_HOST is set, the build still runs and the upload is skipped.
 name: Build & Deploy
 
@@ -26,8 +26,9 @@ jobs:
     env:
       SSH_HOST: ${{ secrets.SSH_HOST }}
       SSH_USER: ${{ secrets.SSH_USER }}
+      SSHPASS: ${{ secrets.SSH_PASSWORD }}
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-      APP_DIR: ${{ secrets.APP_DIR || 'liveflow' }}
+      APP_DIR: ${{ secrets.APP_DIR || 'www/livechat' }}
       APP_PORT: ${{ secrets.APP_PORT || '3001' }}
     steps:
       - uses: actions/checkout@v5
@@ -66,15 +67,14 @@ jobs:
       - name: Set up SSH
         if: env.SSH_HOST != ''
         run: |
+          sudo apt-get install -y -qq sshpass
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Upload and restart
         if: env.SSH_HOST != ''
         run: |
-          SSH="ssh -i $HOME/.ssh/id_deploy -p $SSH_PORT $SSH_USER@$SSH_HOST"
+          SSH="sshpass -e ssh -p $SSH_PORT -o PreferredAuthentications=password,keyboard-interactive $SSH_USER@$SSH_HOST"
 
           # Replace the built files; the data folder lives outside APP_DIR so it survives deploys.
           tar -czf - -C release . | $SSH "mkdir -p '$APP_DIR' && cd '$APP_DIR' && rm -rf dist server-dist && tar -xzf -"
