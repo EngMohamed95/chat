@@ -70,6 +70,8 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          # The server resets plain-FTP data connections; it expects explicit TLS.
+          protocol: ftps
           local-dir: ./release/
           server-dir: ${{ secrets.FTP_DIR || './' }}
           # Override the default exclude list, which skips node_modules.
