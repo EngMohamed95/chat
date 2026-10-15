@@ -253,7 +253,9 @@ function publishProfiles() {
 // -----------------------------------------------------------------------------
 
 const app = express();
-if (process.env.TRUST_PROXY) app.set('trust proxy', 1);
+// Hosting platforms proxy from the same machine; trusting loopback keeps req.ip
+// the real visitor address so login throttling is per visitor.
+app.set('trust proxy', process.env.TRUST_PROXY ? 1 : 'loopback');
 app.disable('x-powered-by');
 
 app.use(
@@ -752,6 +754,15 @@ if (IS_PROD) {
   }
   app.use(express.static(DIST_DIR, { index: false }));
   app.get('*', (_req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+
+  // FTP deploys refresh tmp/restart.txt last; exit so the host's process
+  // supervisor starts the new build.
+  fs.watchFile(path.join(ROOT, 'tmp', 'restart.txt'), { interval: 5000 }, (curr, prev) => {
+    if (curr.mtimeMs === prev.mtimeMs) return;
+    console.log('New deploy detected, restarting');
+    db.flush();
+    process.exit(0);
+  });
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({

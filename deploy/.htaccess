@@ -1,7 +1,0 @@
-# Send every request to the LiveFlow Node server started by start.sh.
-# The port must match PORT in start.sh.
-RewriteEngine On
-RewriteRule ^(.*)$ http://127.0.0.1:38471/$1 [P,L]
-
-# Compression would buffer the realtime event stream.
-SetEnvIf Request_URI ^/api/events no-gzip=1

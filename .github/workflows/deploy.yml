@@ -38,7 +38,7 @@ jobs:
       - name: Assemble deploy package
         run: |
           mkdir release
-          cp -r dist server-dist deploy/start.sh deploy/.htaccess release/
+          cp -r dist server-dist release/
           # express is bundled into server-dist, so there is nothing to npm install.
           cat > release/package.json <<'JSON'
           {
@@ -50,7 +50,7 @@ jobs:
             "scripts": { "start": "node server-dist/index.mjs" }
           }
           JSON
-          # Touching tmp/restart.txt tells the panel's Node app manager to restart the app.
+          # The server exits when tmp/restart.txt changes, and the host restarts it.
           mkdir -p release/tmp
           date -u > release/tmp/restart.txt
 
@@ -74,6 +74,8 @@ jobs:
           set net:timeout 20
           set net:max-retries 3
           set net:reconnect-interval-base 5
-          mirror --reverse --verbose --parallel=1 release/ "$FTP_DIR"
+          mirror --reverse --verbose --parallel=1 --exclude tmp/ release/ "$FTP_DIR"
+          mkdir -p -f "$FTP_DIR/tmp"
+          put release/tmp/restart.txt -o "$FTP_DIR/tmp/restart.txt"
           bye
           EOF
