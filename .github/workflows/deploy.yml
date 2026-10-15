@@ -60,12 +60,20 @@ jobs:
 
       - name: Upload over FTP
         if: env.FTP_SERVER != ''
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          # The server resets plain-FTP data connections; it expects explicit TLS.
-          protocol: ftps
-          local-dir: ./release/
-          server-dir: ${{ secrets.FTP_DIR || './' }}
+        env:
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ secrets.FTP_DIR || '.' }}
+        run: |
+          sudo apt-get install -y -qq lftp
+          # Shared-hosting FTP certificates are issued for the server name, not
+          # the account's domain, so TLS is used without verifying the hostname.
+          lftp --env-password -u "$FTP_USERNAME" "$FTP_SERVER" <<EOF
+          set ftp:ssl-allow yes
+          set ssl:verify-certificate no
+          set net:timeout 20
+          set net:max-retries 3
+          set net:reconnect-interval-base 5
+          mirror --reverse --verbose --parallel=1 release/ "$FTP_DIR"
+          bye
+          EOF
