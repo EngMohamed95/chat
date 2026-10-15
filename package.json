@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "vite build && npm run build:server",
-    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=server-dist/index.mjs --define:process.env.NODE_ENV='\"production\"'",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --target=node20 --external:vite --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=server-dist/index.mjs --define:process.env.NODE_ENV='\"production\"'",
     "start": "node server-dist/index.mjs",
     "clean": "rm -rf dist server-dist",
     "lint": "tsc --noEmit"

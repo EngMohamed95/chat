@@ -39,22 +39,17 @@ jobs:
         run: |
           mkdir release
           cp -r dist server-dist release/
-          # The bundled server only needs express at runtime.
-          node -e '
-            const pkg = require("./package.json");
-            const out = {
-              name: "liveflow",
-              private: true,
-              type: "module",
-              main: "server-dist/index.mjs",
-              engines: { node: ">=20.11" },
-              scripts: { start: "node server-dist/index.mjs" },
-              dependencies: { express: pkg.dependencies.express },
-            };
-            console.log(JSON.stringify(out, null, 2));
-          ' > release/package.json
-          # FTP cannot run npm on the server, so ship node_modules with the build.
-          (cd release && npm install --omit=dev --no-audit --no-fund)
+          # express is bundled into server-dist, so there is nothing to npm install.
+          cat > release/package.json <<'JSON'
+          {
+            "name": "liveflow",
+            "private": true,
+            "type": "module",
+            "main": "server-dist/index.mjs",
+            "engines": { "node": ">=20.11" },
+            "scripts": { "start": "node server-dist/index.mjs" }
+          }
+          JSON
           # Touching tmp/restart.txt tells the panel's Node app manager to restart the app.
           mkdir -p release/tmp
           date -u > release/tmp/restart.txt
@@ -74,7 +69,3 @@ jobs:
           protocol: ftps
           local-dir: ./release/
           server-dir: ${{ secrets.FTP_DIR || './' }}
-          # Override the default exclude list, which skips node_modules.
-          exclude: |
-            **/.git*
-            **/.git*/**
