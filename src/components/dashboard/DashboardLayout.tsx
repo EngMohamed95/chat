@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Link2, Check } from 'lucide-react';
 import { Conversation, Message, Profile, CannedReply } from '../../types';
 import { liveflowService } from '../../lib/api';
-import { useCustomerChatLinks } from '../../lib/chatLink';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { sound } from '../../lib/sound';
@@ -14,11 +12,7 @@ import { UsersManagement } from './UsersManagement';
 import { SettingsPage } from './SettingsPage';
 import { InstallCodePage } from './InstallCodePage';
 
-interface DashboardLayoutProps {
-  onSwitchToPreview: () => void;
-}
-
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onSwitchToPreview }) => {
+export const DashboardLayout: React.FC = () => {
   const { profile, isAdmin } = useAuth();
   const { t } = useSettings();
 
@@ -29,14 +23,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onSwitchToPrev
   const [cannedReplies, setCannedReplies] = useState<CannedReply[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [linkCopied, setLinkCopied] = useState(false);
-  const { shareLink } = useCustomerChatLinks();
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareLink).catch(() => {});
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
 
   // 1. Initial Load of conversations, agents, canned replies
   useEffect(() => {
@@ -145,14 +131,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onSwitchToPrev
     });
   };
 
-  const handleTabChange = (tab: string) => {
-    if (tab === 'preview') {
-      onSwitchToPreview();
-      return;
-    }
-    setCurrentTab(tab);
-  };
-
   return (
     <div className="h-screen w-full flex flex-col bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans overflow-hidden select-none">
       {/* Top Application Bar */}
@@ -166,29 +144,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onSwitchToPrev
             Enterprise Omnichannel Customer Support
           </span>
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Customer chat link (copy to share) */}
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900/60"
-            title={shareLink}
-          >
-            {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
-            <span>{linkCopied ? t('copied') : t('customerLink')}</span>
-          </button>
-
-          {/* Test Customer View Button */}
-          <button
-            type="button"
-            onClick={onSwitchToPreview}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:opacity-90 rounded-xl transition-all shadow-xs cursor-pointer"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Customer Website View</span>
-          </button>
-        </div>
       </header>
 
       {/* Main App Workspace */}
@@ -196,7 +151,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onSwitchToPrev
         {/* Column 1: Sidebar Navigation */}
         <Sidebar
           currentTab={currentTab}
-          onTabChange={handleTabChange}
+          onTabChange={setCurrentTab}
           isOnline={isOnline}
           onToggleOnline={(online) => {
             setIsOnline(online);

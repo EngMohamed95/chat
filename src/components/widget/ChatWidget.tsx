@@ -21,21 +21,19 @@ import { isArabic, getTextDirection } from '../../lib/rtl';
 import { EmojiPicker } from './EmojiPicker';
 import { PreChatModal } from './PreChatModal';
 import { CSATSurveyCard } from './CSATSurveyCard';
+import { Attachment } from '../common/Attachment';
 
 interface ChatWidgetProps {
   initialOpen?: boolean;
   isEmbedded?: boolean;
-  /** Standalone customer page (/chat): always open and fills the screen. */
-  fullPage?: boolean;
 }
 
 export const ChatWidget: React.FC<ChatWidgetProps> = ({
   initialOpen = false,
   isEmbedded = false,
-  fullPage = false,
 }) => {
   const { settings, loading: settingsLoading } = useSettings();
-  const [isOpen, setIsOpen] = useState(initialOpen || fullPage);
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const [visitorId, setVisitorId] = useState<string>('');
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -284,11 +282,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
   return (
     <div
       className={
-        fullPage
-          ? 'fixed inset-0 flex items-stretch sm:items-center justify-center sm:p-6 bg-zinc-100 dark:bg-zinc-950 font-sans antialiased text-zinc-900'
-          : isEmbedded
-            ? 'fixed inset-0 flex items-center justify-center font-sans antialiased text-zinc-900 select-none'
-            : `fixed ${positionClass} bottom-6 z-50 font-sans antialiased text-zinc-900 select-none`
+        isEmbedded
+          ? 'fixed inset-0 flex items-center justify-center font-sans antialiased text-zinc-900 select-none'
+          : `fixed ${positionClass} bottom-6 z-50 font-sans antialiased text-zinc-900 select-none`
       }
     >
       {/* 1. Floating Circular Chat Button */}
@@ -317,11 +313,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
       {isOpen && (
         <div
           className={`${
-            fullPage
-              ? 'w-full h-full sm:max-w-lg sm:h-[min(720px,100%)] sm:rounded-3xl shadow-2xl border'
-              : isEmbedded
-                ? 'w-full h-full'
-                : 'w-[380px] sm:w-[400px] h-[600px] max-h-[calc(100vh-80px)] rounded-3xl shadow-2xl border'
+            isEmbedded
+              ? 'w-full h-full'
+              : 'w-[380px] sm:w-[400px] h-[600px] max-h-[calc(100vh-80px)] rounded-3xl shadow-2xl border'
           } bg-white dark:bg-zinc-900 border-zinc-200/80 dark:border-zinc-800 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200`}
         >
           {/* Header */}
@@ -368,16 +362,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                   <VolumeX className="w-4 h-4 text-white/60" />
                 )}
               </button>
-              {!fullPage && (
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-white/20 hover:text-white transition-colors"
-                  title="Minimize chat"
-                >
-                  <Minimize2 className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-full hover:bg-white/20 hover:text-white transition-colors"
+                title="Minimize chat"
+              >
+                <Minimize2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -436,16 +428,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                             : 'bg-white dark:bg-zinc-850 text-zinc-800 dark:text-zinc-100 border border-zinc-200/70 dark:border-zinc-800 rounded-bl-xs'
                         } ${isAr ? 'font-arabic' : ''}`}
                       >
-                        {/* Image attachment */}
-                        {msg.attachment_url && (
-                          <div className="mb-2 rounded-xl overflow-hidden max-h-48">
-                            <img
-                              src={msg.attachment_url}
-                              alt="Attachment"
-                              className="w-full object-cover"
-                            />
-                          </div>
-                        )}
+                        {msg.attachment_url && <Attachment url={msg.attachment_url} imageClassName="max-h-48" />}
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       </div>
 

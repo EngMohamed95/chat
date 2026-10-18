@@ -2,7 +2,6 @@ import express, { type NextFunction, type Request, type RequestHandler, type Res
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
 import type { Message, Profile, Settings } from '../src/types';
 import { computeAnalytics } from './analytics';
@@ -184,16 +183,6 @@ function conversationFor(auth: Auth, id: string): ConversationRecord {
     throw new HttpError(404, 'Conversation not found');
   }
   return conv;
-}
-
-function lanUrls(): string[] {
-  const urls: string[] = [];
-  for (const addrs of Object.values(os.networkInterfaces())) {
-    for (const addr of addrs || []) {
-      if (addr.family === 'IPv4' && !addr.internal) urls.push(`http://${addr.address}:${PORT}`);
-    }
-  }
-  return urls;
 }
 
 // -----------------------------------------------------------------------------
@@ -733,10 +722,6 @@ app.get('/api/analytics', requireAgent, (_req, res) => {
   res.json(computeAnalytics(db.state, onlineAgentIds()));
 });
 
-app.get('/api/server-info', requireAgent, (_req, res) => {
-  res.json({ port: PORT, lanUrls: lanUrls() });
-});
-
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
@@ -797,8 +782,6 @@ httpServer.on('error', (err: NodeJS.ErrnoException) => {
 httpServer.listen(PORT, HOST, () => {
   console.log(`\n  LiveFlow ${IS_PROD ? '(production)' : '(development)'} is running`);
   console.log(`  Dashboard:     http://localhost:${PORT}/`);
-  console.log(`  Customer chat: http://localhost:${PORT}/chat`);
-  for (const url of lanUrls()) console.log(`  On your network: ${url}/chat`);
   console.log(`  Data folder:   ${DATA_DIR}\n`);
 });
 

@@ -10,7 +10,6 @@ import {
   Globe,
   LogOut,
   Radio,
-  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -147,19 +146,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Section: Preferences & Logout */}
       <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-        {/* Quick Website Test Link */}
-        <button
-          type="button"
-          onClick={() => onTabChange('preview')}
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
-        >
-          <span className="flex items-center gap-2">
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Test Customer View</span>
-          </span>
-          <span className="text-[10px] bg-emerald-200 dark:bg-emerald-800 px-1.5 py-0.5 rounded">Live</span>
-        </button>
-
         {/* Language & Theme Controls */}
         <div className="flex items-center justify-between px-2 py-1 text-xs text-zinc-500">
           {/* Language Switch */}

@@ -193,10 +193,6 @@ export const liveflowService = {
     return res.profile;
   },
 
-  async getServerInfo(): Promise<{ port: number; lanUrls: string[] }> {
-    return request('GET', '/api/server-info', { as: 'agent' });
-  },
-
   // 2. SETTINGS
   async getSettings(): Promise<Settings> {
     return request('GET', '/api/settings');

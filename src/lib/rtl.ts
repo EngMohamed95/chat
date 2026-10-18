@@ -82,13 +82,6 @@ export const translations = {
     passwordUpdated: 'Password updated',
 
     // Customer chat link
-    customerLink: 'Customer Chat Link',
-    customerLinkDesc: 'Share this link with customers (WhatsApp, social media, your website). It opens a full-page chat with your team.',
-    copyLink: 'Copy Link',
-    copied: 'Copied!',
-    openLink: 'Open',
-    networkLinks: 'Links for devices on your network (Wi-Fi)',
-    localhostWarning: 'A localhost link only works on this computer. Customers on the same Wi-Fi can use the network links; for customers on the internet, deploy the app to a server with a domain.',
     
     // Widget
     weAreOnline: 'Online - We reply immediately',
@@ -185,13 +178,6 @@ export const translations = {
     passwordUpdated: 'تم تغيير كلمة المرور',
 
     // Customer chat link
-    customerLink: 'رابط دردشة العملاء',
-    customerLinkDesc: 'شارك هذا الرابط مع عملائك (واتساب، السوشيال ميديا، موقعك). يفتح صفحة دردشة كاملة مع فريقك.',
-    copyLink: 'نسخ الرابط',
-    copied: 'تم النسخ!',
-    openLink: 'فتح',
-    networkLinks: 'روابط للأجهزة على نفس الشبكة (الواي فاي)',
-    localhostWarning: 'رابط localhost يعمل على هذا الجهاز فقط. العملاء على نفس الواي فاي يستخدمون روابط الشبكة، وللعملاء على الإنترنت ارفع البرنامج على سيرفر بدومين.',
     
     // Widget
     weAreOnline: 'متصل - نرد عادة في ثوانٍ',

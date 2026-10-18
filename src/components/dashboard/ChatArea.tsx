@@ -19,6 +19,7 @@ import { liveflowService } from '../../lib/api';
 import { sound } from '../../lib/sound';
 import { isArabic, getTextDirection } from '../../lib/rtl';
 import { CannedReplySelector } from './CannedReplySelector';
+import { Attachment } from '../common/Attachment';
 
 interface ChatAreaProps {
   conversation: Conversation | null;
@@ -362,16 +363,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           : 'bg-emerald-600 text-white rounded-br-xs'
                       } ${isAr ? 'font-arabic' : ''}`}
                     >
-                      {/* Image Attachment */}
-                      {msg.attachment_url && (
-                        <div className="mb-2 rounded-xl overflow-hidden max-h-60">
-                          <img
-                            src={msg.attachment_url}
-                            alt="Attachment"
-                            className="w-full object-cover"
-                          />
-                        </div>
-                      )}
+                      {msg.attachment_url && <Attachment url={msg.attachment_url} />}
                       <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                     </div>
 
