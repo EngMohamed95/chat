@@ -1,6 +1,7 @@
 # Builds the app on every push to main and uploads it to the hosting over FTP.
 # The site runs on plain Apache + PHP: the built frontend and api/ go into the
-# site folder; the data lives outside it in ~/liveflow-data (never uploaded).
+# site folder. The data lives in <site>/data (blocked from the web by .htaccess)
+# and is never uploaded or deleted by this workflow.
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
 #   FTP_SERVER    FTP hostname

@@ -257,6 +257,8 @@ function data_dir(): string
     // Development: the repository's data/ folder next to api/.
     $repoData = dirname(__DIR__, 2) . '/data';
     if (is_dir($repoData) && file_exists(dirname(__DIR__, 2) . '/package.json')) return $repoData;
-    // Hosting: api/ sits in the site folder (~/www/<site>/api), data lives outside the web root in ~/liveflow-data.
-    return dirname(__DIR__, 4) . '/liveflow-data';
+    // Hosting: api/ sits in the site folder (~/www/<site>/api). Use ~/liveflow-data when it exists (outside
+    // the web root); otherwise <site>/data, which the site's .htaccess and data/.htaccess both refuse to serve.
+    $outside = dirname(__DIR__, 4) . '/liveflow-data';
+    return is_dir($outside) ? $outside : dirname(__DIR__, 2) . '/data';
 }
