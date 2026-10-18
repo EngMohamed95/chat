@@ -848,6 +848,28 @@ function route(string $method, string $path)
         return $reply;
     }
 
+    if ($method === 'POST' && $path === '/api/settings/test-email') {
+        require_admin();
+        $to = trim((string)(body()['to'] ?? ''));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) throw new HttpError(400, 'Enter a valid email address');
+        $settings = db()['settings'];
+        $from = mail_sender($settings);
+        $company = (string)($settings['company_name'] ?? 'Support');
+        $result = send_mail([
+            'to' => $to,
+            'subject' => "Test email from $company",
+            'html' => '<p dir="auto">' . mail_escape("هذه رسالة تجربة من $company. | This is a test email from $company.") . '</p>',
+            'from' => $from,
+            'fromName' => $company,
+        ]);
+        return $result + [
+            'from' => $from,
+            'php_version' => PHP_VERSION,
+            'sendmail_path' => (string)ini_get('sendmail_path'),
+            'mail_disabled' => in_array('mail', array_map('trim', explode(',', (string)ini_get('disable_functions'))), true),
+        ];
+    }
+
     if ($method === 'GET' && $path === '/api/analytics') {
         require_agent();
         return compute_analytics(db(), online_agent_ids());

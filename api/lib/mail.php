@@ -147,32 +147,44 @@ function queue_reply_email(array $conv, array $messages, array $settings): void
     ];
 }
 
+/**
+ * Sends one email with PHP's mail().
+ * @param array{to:string,subject:string,html:string,from:string,fromName:string} $m
+ * @return array{sent:bool,error:?string}
+ */
+function send_mail(array $m): array
+{
+    $encode = function (string $s): string { return '=?UTF-8?B?' . base64_encode($s) . '?='; };
+    $headers = implode("\r\n", [
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        'From: ' . $encode($m['fromName']) . ' <' . $m['from'] . '>',
+        'Reply-To: ' . $m['from'],
+    ]);
+    $body = chunk_split(base64_encode($m['html']));
+    $subject = $encode($m['subject']);
+
+    $logFile = getenv('LIVEFLOW_MAIL_LOG');
+    if ($logFile) {
+        // Development: write the email to a file instead of sending it.
+        file_put_contents($logFile, "To: {$m['to']}\r\nSubject: $subject\r\n$headers\r\n\r\n{$m['html']}\r\n\r\n", FILE_APPEND);
+        return ['sent' => true, 'error' => null];
+    }
+    if (!function_exists('mail')) return ['sent' => false, 'error' => 'mail() is disabled on this server'];
+    error_clear_last();
+    $sent = @mail($m['to'], $subject, $body, $headers, '-f' . $m['from']);
+    // Some hosts refuse a custom envelope sender; try once more with their default.
+    if (!$sent) $sent = @mail($m['to'], $subject, $body, $headers);
+    $error = $sent ? null : (error_get_last()['message'] ?? 'mail() returned false');
+    if (!$sent) error_log("LiveFlow: could not email {$m['to']}: $error");
+    return ['sent' => $sent, 'error' => $error];
+}
+
 /** Sends the queued emails. Runs after the response is sent and the data lock is released. */
 function send_pending_mails(): void
 {
     global $pendingMails;
-    foreach ($pendingMails as $m) {
-        $encode = function (string $s): string { return '=?UTF-8?B?' . base64_encode($s) . '?='; };
-        $headers = implode("\r\n", [
-            'MIME-Version: 1.0',
-            'Content-Type: text/html; charset=UTF-8',
-            'Content-Transfer-Encoding: base64',
-            'From: ' . $encode($m['fromName']) . ' <' . $m['from'] . '>',
-            'Reply-To: ' . $m['from'],
-        ]);
-        $body = chunk_split(base64_encode($m['html']));
-        $subject = $encode($m['subject']);
-
-        $logFile = getenv('LIVEFLOW_MAIL_LOG');
-        if ($logFile) {
-            // Development: write the email to a file instead of sending it.
-            file_put_contents($logFile, "To: {$m['to']}\r\nSubject: $subject\r\n$headers\r\n\r\n{$m['html']}\r\n\r\n", FILE_APPEND);
-            continue;
-        }
-        $sent = @mail($m['to'], $subject, $body, $headers, '-f' . $m['from']);
-        // Some hosts refuse a custom envelope sender; try once more with their default.
-        if (!$sent) $sent = @mail($m['to'], $subject, $body, $headers);
-        if (!$sent) error_log("LiveFlow: could not email reply to {$m['to']}");
-    }
+    foreach ($pendingMails as $m) send_mail($m);
     $pendingMails = [];
 }
