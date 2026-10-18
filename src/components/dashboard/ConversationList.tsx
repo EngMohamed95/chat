@@ -67,7 +67,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   return (
-    <div className="w-80 md:w-96 bg-zinc-50/50 dark:bg-zinc-900/60 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0 select-none">
+    <div className="w-full md:w-80 lg:w-96 bg-zinc-50/50 dark:bg-zinc-900/60 border-r border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0 select-none">
       {/* Header & Search */}
       <div className="p-3.5 border-b border-zinc-200 dark:border-zinc-800 space-y-2.5">
         <div className="flex items-center justify-between">

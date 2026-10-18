@@ -13,6 +13,7 @@ import {
   FileText,
   Clock,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react';
 import { Conversation, Message, Profile, CannedReply } from '../../types';
 import { liveflowService } from '../../lib/api';
@@ -28,6 +29,8 @@ interface ChatAreaProps {
   cannedReplies: CannedReply[];
   onConversationUpdated: (updated: Conversation) => void;
   t: (key: any) => string;
+  /** Phones show one pane at a time: returns to the conversation list. */
+  onBack?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -37,6 +40,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   cannedReplies,
   onConversationUpdated,
   t,
+  onBack,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -251,9 +255,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden relative">
       {/* Top Header Bar */}
-      <div className="p-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 bg-white dark:bg-zinc-900 select-none">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+      <div className="p-2.5 sm:p-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 sm:gap-3 bg-white dark:bg-zinc-900 select-none">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="md:hidden p-2 -ms-1 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              aria-label="Back to conversations"
+            >
+              <ArrowLeft className="w-5 h-5 rtl:rotate-180" />
+            </button>
+          )}
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
             {conversation.visitor_name ? conversation.visitor_name.charAt(0).toUpperCase() : 'V'}
           </div>
           <div className="min-w-0">
@@ -283,7 +297,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <select
               value={conversation.assigned_to || ''}
               onChange={(e) => handleAssignAgent(e.target.value)}
-              className="bg-transparent text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs max-w-[6rem] sm:max-w-none text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
             >
               <option value="">{t('unassigned')}</option>
               {agents.map((ag) => (
@@ -307,12 +321,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {conversation.status === 'open' ? (
               <>
                 <CheckCircle className="w-3.5 h-3.5 text-zinc-500" />
-                <span>{t('closeChat')}</span>
+                <span className="hidden sm:inline">{t('closeChat')}</span>
               </>
             ) : (
               <>
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>{t('reopenChat')}</span>
+                <span className="hidden sm:inline">{t('reopenChat')}</span>
               </>
             )}
           </button>
