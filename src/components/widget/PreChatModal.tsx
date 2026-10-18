@@ -104,7 +104,7 @@ export const PreChatModal: React.FC<PreChatModalProps> = ({
               className="w-full text-xs pl-9 pr-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400"
             />
           </div>
-          <p className="text-[11px] text-zinc-400 mt-1">If you leave the page, we will email you our reply.</p>
+          <p className="text-[11px] text-zinc-400 mt-1">We will also send our replies to this email.</p>
         </div>
 
         <div>

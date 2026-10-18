@@ -1,21 +1,8 @@
 <?php
 /**
- * Emails agent replies to visitors who left the website without reading them,
- * so a question asked and abandoned still gets its answer.
- *
- * Each public agent reply schedules its conversation in the mail queue. The
- * queue is checked whenever anyone polls (agents poll constantly while the
- * dashboard is open): once a reply is due, it is emailed if the visitor has
- * not read it and is no longer on the site; if they are still there, it is
- * checked again a minute later.
+ * Emails every public agent reply to the visitor as well, so a visitor who
+ * closed the website still gets the answer.
  */
-
-/** A visitor counts as still on the site while its widget has polled within this many seconds. */
-const VISITOR_ONLINE_SECONDS = 30;
-/** How long to wait for a visitor who is still on the site to read a reply before checking again. */
-const MAIL_RECHECK_SECONDS = 60;
-/** Unread replies older than this are no longer emailed. */
-const MAIL_GIVE_UP_SECONDS = 24 * 3600;
 
 /** @var array<int, array{to:string,subject:string,html:string,from:string,fromName:string}> */
 $pendingMails = [];
@@ -48,65 +35,7 @@ function mail_safe_link(string $url, string $sender): string
     return $host === $domain || substr($host, -strlen($suffix)) === $suffix ? $url : '';
 }
 
-function visitor_is_online(array $visitorSeen, string $visitorId): bool
-{
-    return time() - (int)($visitorSeen[$visitorId] ?? 0) <= VISITOR_ONLINE_SECONDS;
-}
-
-/** Puts a conversation in the mail queue after an agent's public reply. */
-function schedule_reply_email(Store $store, array $conv, array $msg, array $visitorSeen): void
-{
-    if (!filter_var(trim((string)($conv['visitor_contact'] ?? '')), FILTER_VALIDATE_EMAIL)) return;
-    $queue = $store->readSide('mail_queue');
-    $due = visitor_is_online($visitorSeen, $conv['visitor_id']) ? time() + MAIL_RECHECK_SECONDS : time();
-    $entry = $queue[$conv['id']] ?? ['since' => $msg['created_at'], 'due' => $due];
-    $entry['due'] = min((int)$entry['due'], $due);
-    $queue[$conv['id']] = $entry;
-    $store->writeSide('mail_queue', $queue);
-}
-
-/** Emails the due conversations whose visitors left without reading the replies. */
-function process_mail_queue(Store $store): void
-{
-    $queue = $store->readSide('mail_queue');
-    if (!$queue) return;
-    $now = time();
-    $due = array_filter($queue, function ($e) use ($now) { return (int)$e['due'] <= $now; });
-    if (!$due) return;
-    // Loaded only when something is due: visitors poll often and the queue is usually empty.
-    $db = $store->db();
-
-    $visitorSeen = $store->readSide('visitors');
-    $convs = [];
-    foreach ($db['conversations'] as $c) if (isset($due[$c['id']])) $convs[$c['id']] = $c;
-
-    foreach ($due as $convId => $entry) {
-        $conv = $convs[$convId] ?? null;
-        $unread = [];
-        if ($conv) {
-            foreach ($db['messages'] as $m) {
-                if ($m['conversation_id'] === $convId && $m['sender_type'] === 'agent' && empty($m['is_internal_note'])
-                    && empty($m['seen']) && strcmp($m['created_at'], $entry['since']) >= 0) {
-                    $unread[] = $m;
-                }
-            }
-        }
-        $tooOld = $now - strtotime($entry['since']) > MAIL_GIVE_UP_SECONDS;
-        if (!$unread || $tooOld) {
-            unset($queue[$convId]);
-        } elseif (visitor_is_online($visitorSeen, $conv['visitor_id'])) {
-            // Still on the site: they may yet read it in the chat.
-            $queue[$convId]['due'] = $now + MAIL_RECHECK_SECONDS;
-        } else {
-            usort($unread, function ($a, $b) { return strcmp($a['created_at'], $b['created_at']); });
-            queue_reply_email($conv, $unread, $db['settings']);
-            unset($queue[$convId]);
-        }
-    }
-    $store->writeSide('mail_queue', $queue);
-}
-
-/** @param array[] $messages unread agent replies, oldest first */
+/** @param array[] $messages agent replies to include, oldest first */
 function queue_reply_email(array $conv, array $messages, array $settings): void
 {
     global $pendingMails;

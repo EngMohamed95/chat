@@ -330,18 +330,6 @@ function update_presence(string $userId, ?bool $away = null): void
     $store->writeSide('presence', $presence);
 }
 
-/** Remembers when each visitor's widget last polled, so replies are emailed only to visitors who left. */
-function update_visitor_presence(string $visitorId): void
-{
-    global $store;
-    $seen = $store->readSide('visitors');
-    if (time() - (int)($seen[$visitorId] ?? 0) < 10) return;
-    $cutoff = time() - 3600;
-    $seen = array_filter($seen, function ($t) use ($cutoff) { return $t >= $cutoff; });
-    $seen[$visitorId] = time();
-    $store->writeSide('visitors', $seen);
-}
-
 // --- Login throttling ------------------------------------------------------------
 
 function throttle_key(string $username): string
@@ -445,10 +433,7 @@ function route(string $method, string $path)
         if ($isAgent) {
             update_presence($auth['user']['id']);
             $result['onlineAgents'] = online_agent_ids();
-        } else {
-            update_visitor_presence($auth['visitorId']);
         }
-        process_mail_queue($store);
         return $result;
     }
 
@@ -788,8 +773,7 @@ function route(string $method, string $path)
             publish('staff', 'message_created', $msg);
             if (!$msg['is_internal_note']) publish('visitor:' . $result['visitor_id'], 'message_created', $msg);
             if ($isAgent && !$msg['is_internal_note']) {
-                schedule_reply_email($store, $result, $msg, $store->readSide('visitors'));
-                process_mail_queue($store);
+                queue_reply_email($result, [$msg], db()['settings']);
             }
             publish_conversation($result);
             return $msg;
