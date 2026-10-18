@@ -185,8 +185,9 @@ export const DashboardLayout: React.FC = () => {
           <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMenuOpen(false)} aria-hidden="true" />
         )}
         <div
-          className={`fixed inset-y-0 start-0 z-50 flex transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
-            menuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
+          className={`fixed inset-y-0 start-0 z-50 flex transition-transform duration-200 md:static md:z-auto ${
+            // Slid off-screen only on phones; in RTL the menu sits on the right, so it slides the other way.
+            menuOpen ? 'translate-x-0' : 'max-md:-translate-x-full max-md:rtl:translate-x-full'
           } ${sidebarHidden ? 'md:hidden' : ''}`}
         >
         <Sidebar
