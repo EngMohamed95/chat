@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                {settings.company_name || 'LiveFlow'}
+                {settings.company_name}
               </h2>
               <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">
                 Support Hub

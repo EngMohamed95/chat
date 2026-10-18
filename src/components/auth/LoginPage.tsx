@@ -58,7 +58,7 @@ export const LoginPage: React.FC = () => {
             <MessageSquare className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
-            {needsSetup ? t('setupTitle') : `${settings.company_name || 'LiveFlow'} — ${t('staffPortal')}`}
+            {needsSetup ? t('setupTitle') : settings.company_name ? `${settings.company_name} — ${t('staffPortal')}` : t('staffPortal')}
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {needsSetup ? t('setupSubtitle') : t('loginSubtitle')}

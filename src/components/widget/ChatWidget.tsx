@@ -8,7 +8,6 @@ import {
   Check,
   CheckCheck,
   Minimize2,
-  FileText,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -532,10 +531,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
                   </button>
                 </form>
 
-                <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-zinc-400">
-                  <FileText className="w-2.5 h-2.5" />
-                  <span>Powered by LiveFlow</span>
-                </div>
               </div>
             </div>
           )}

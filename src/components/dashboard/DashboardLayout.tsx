@@ -15,7 +15,7 @@ import { InstallCodePage } from './InstallCodePage';
 
 export const DashboardLayout: React.FC = () => {
   const { profile, isAdmin } = useAuth();
-  const { t } = useSettings();
+  const { settings, t } = useSettings();
 
   const [currentTab, setCurrentTab] = useState<string>('conversations');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -96,7 +96,7 @@ export const DashboardLayout: React.FC = () => {
           // Request desktop notification if permitted
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             try {
-              new Notification('New LiveFlow Message', {
+              new Notification(document.title, {
                 body: newMsg.content || 'Visitor uploaded an attachment',
                 icon: '/vite.svg',
               });
@@ -172,12 +172,8 @@ export const DashboardLayout: React.FC = () => {
             <Menu className="w-5 h-5" />
             {totalUnread > 0 && <span className="absolute top-1.5 end-1.5 w-2 h-2 rounded-full bg-rose-500" />}
           </button>
-          <span className="font-extrabold text-sm tracking-tight text-emerald-600 dark:text-emerald-400">
-            LiveFlow Inbox
-          </span>
-          <span className="text-zinc-300 dark:text-zinc-700">|</span>
-          <span className="text-xs text-zinc-500 font-medium hidden sm:inline">
-            Enterprise Omnichannel Customer Support
+          <span className="font-extrabold text-sm tracking-tight text-emerald-600 dark:text-emerald-400 truncate">
+            {settings.company_name}
           </span>
         </div>
       </header>

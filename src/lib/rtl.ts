@@ -92,7 +92,6 @@ export const translations = {
     startChat: 'Start Chat',
     typeMessage: 'Type your message...',
     fileUpload: 'Upload image or document',
-    poweredBy: 'Powered by LiveFlow',
     
     // Analytics
     totalConversations: 'Total Conversations',
@@ -188,7 +187,6 @@ export const translations = {
     startChat: 'بدء الدردشة',
     typeMessage: 'اكتب رسالتك هنا...',
     fileUpload: 'رفع ملف أو صورة',
-    poweredBy: 'مشغل بواسطة LiveFlow',
     
     // Analytics
     totalConversations: 'إجمالي المحادثات',

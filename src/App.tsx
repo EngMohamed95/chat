@@ -27,7 +27,7 @@ function AppContent() {
       <div className="min-h-screen w-full flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 text-zinc-400">
         <div className="flex flex-col items-center gap-3">
           <div className="w-9 h-9 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs font-semibold">Initializing LiveFlow...</p>
+          <p className="text-xs font-semibold">Loading...</p>
         </div>
       </div>
     );

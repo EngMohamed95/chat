@@ -20,7 +20,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>({
     id: 'default',
-    company_name: 'LiveFlow Support',
+    company_name: '',
     logo_url: null,
     primary_color: '#10b981',
     welcome_message: 'Hi there! 👋 Welcome to our site. How can our team help you today?',
@@ -98,6 +98,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const t = (key: keyof typeof translations.en): string => {
     return translations[lang]?.[key] || translations.en[key] || String(key);
   };
+
+  // The browser tab shows the company name, not the product's.
+  useEffect(() => {
+    if (!loading && settings.company_name) document.title = settings.company_name;
+  }, [loading, settings.company_name]);
 
   return (
     <SettingsContext.Provider
