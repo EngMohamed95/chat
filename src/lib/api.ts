@@ -319,6 +319,14 @@ export const liveflowService = {
     return res.visitor_id;
   },
 
+  /** Reopens a conversation from the link in a reply email, on any device. */
+  async resumeVisitorSession(resumeToken: string): Promise<void> {
+    const res = await request<{ visitor_id: string; token: string }>('POST', '/api/visitor/resume', {
+      body: { token: resumeToken },
+    });
+    setToken('visitor', res.token);
+  },
+
   // 5. CONVERSATIONS
   async getConversations(): Promise<Conversation[]> {
     return request('GET', '/api/conversations', { as: 'agent' });

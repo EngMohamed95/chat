@@ -67,6 +67,17 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({
     let isMounted = true;
     async function initVisitor() {
       try {
+        // Opened from the "Open the chat" button in a reply email: continue that conversation.
+        const resumeToken = new URLSearchParams(window.location.search).get('resume');
+        if (resumeToken) {
+          try {
+            await liveflowService.resumeVisitorSession(resumeToken);
+            if (isMounted) setIsOpen(true);
+          } catch (err) {
+            console.warn('Chat link could not be used:', err);
+          }
+        }
+
         const uid = await liveflowService.getOrInitVisitorSession();
         if (!isMounted) return;
         setVisitorId(uid);

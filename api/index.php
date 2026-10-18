@@ -201,6 +201,22 @@ function visitor_token(string $visitorId): string
     return 'v1.' . $visitorId . '.' . base64url(hash_hmac('sha256', $visitorId, $store->secret(), true));
 }
 
+/** Days a "continue the chat" link from a reply email keeps working. */
+const RESUME_LINK_DAYS = 30;
+
+/** Signed link token that lets whoever has the reply email reopen that one conversation on any device. */
+function resume_token(string $convId): string
+{
+    $payload = $convId . '.' . (time() + RESUME_LINK_DAYS * 86400);
+    return 'r1.' . $payload . '.' . resume_token_signature($payload);
+}
+
+function resume_token_signature(string $payload): string
+{
+    global $store;
+    return base64url(hash_hmac('sha256', 'resume|' . $payload, $store->secret(), true));
+}
+
 function revoke_sessions(callable $predicate): void
 {
     $db = &dbRef();
@@ -226,7 +242,8 @@ function authenticate(): ?array
 
     if (strncmp($token, 'v1.', 3) === 0) {
         $parts = explode('.', $token);
-        if (count($parts) !== 3 || !preg_match('/^visitor-[0-9a-f-]{36}$/', $parts[1])) return null;
+        // Visitor ids are generated here, or kept from conversations imported from Zaetoon.
+        if (count($parts) !== 3 || !preg_match('/^(visitor-[0-9a-f-]{36}|zt-contact-[0-9]+)$/', $parts[1])) return null;
         return hash_equals(visitor_token($parts[1]), $token) ? ['kind' => 'visitor', 'visitorId' => $parts[1]] : null;
     }
 
@@ -627,6 +644,17 @@ function route(string $method, string $path)
         }
         $visitorId = new_id('visitor');
         return ['visitor_id' => $visitorId, 'token' => visitor_token($visitorId)];
+    }
+
+    if ($method === 'POST' && $path === '/api/visitor/resume') {
+        $parts = explode('.', (string)(body()['token'] ?? ''));
+        $invalid = new HttpError(400, 'This chat link is invalid or has expired');
+        if (count($parts) !== 4 || $parts[0] !== 'r1' || (int)$parts[2] < time()) throw $invalid;
+        if (!hash_equals(resume_token_signature($parts[1] . '.' . $parts[2]), $parts[3])) throw $invalid;
+        foreach (db()['conversations'] as $c) {
+            if ($c['id'] === $parts[1]) return ['visitor_id' => $c['visitor_id'], 'token' => visitor_token($c['visitor_id'])];
+        }
+        throw $invalid;
     }
 
     if ($method === 'GET' && $path === '/api/visitor/conversation') {

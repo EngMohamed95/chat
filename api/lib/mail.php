@@ -45,7 +45,11 @@ function queue_reply_email(array $conv, array $messages, array $settings): void
     $company = (string)($settings['company_name'] ?? 'Support');
     $name = (string)($conv['visitor_name'] ?? '');
     $from = mail_sender($settings);
-    $link = mail_safe_link((string)($conv['metadata']['current_url'] ?? ''), $from);
+    // The button opens the chat on this conversation, on the page it started from (or the site's home page).
+    $page = mail_safe_link((string)($conv['metadata']['current_url'] ?? ''), $from);
+    if ($page === '') $page = 'https://' . substr(strrchr($from, '@'), 1) . '/';
+    $page = preg_replace('/#.*$/', '', $page);
+    $link = $page . (strpos($page, '?') === false ? '?' : '&') . 'lf_chat=' . rawurlencode(resume_token($conv['id']));
     $color = preg_match('/^#[0-9a-f]{3,8}$/i', (string)($settings['primary_color'] ?? '')) ? $settings['primary_color'] : '#10b981';
 
     $bubbles = '';
@@ -53,9 +57,8 @@ function queue_reply_email(array $conv, array $messages, array $settings): void
         $text = $msg['content'] !== '' ? nl2br(mail_escape($msg['content'])) : '📎 Attachment / مرفق';
         $bubbles .= '<div dir="auto" style="background:#f4f4f5;border-radius:8px;padding:14px 16px;font-size:15px;line-height:1.6;margin:0 0 8px">' . $text . '</div>';
     }
-    $button = $link === '' ? '' :
-        '<p style="margin:24px 0 0"><a href="' . mail_escape($link) . '" style="background:' . $color . ';color:#fff;text-decoration:none;'
-        . 'padding:10px 20px;border-radius:8px;display:inline-block;font-weight:bold">تابع المحادثة | Continue the chat</a></p>';
+    $button = '<p style="margin:24px 0 0"><a href="' . mail_escape($link) . '" style="background:' . $color . ';color:#fff;text-decoration:none;'
+        . 'padding:12px 22px;border-radius:8px;display:inline-block;font-weight:bold">افتح المحادثة ورد من الشات | Open the chat to reply</a></p>';
 
     $html = '<!doctype html><html><body style="margin:0;padding:24px;background:#f4f4f5;font-family:Tahoma,Arial,sans-serif">'
         . '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;color:#18181b">'
@@ -64,7 +67,7 @@ function queue_reply_email(array $conv, array $messages, array $settings): void
         . '<p dir="auto" style="margin:0 0 8px;color:#52525b;font-size:13px">لديك رد جديد على محادثتك | You have a new reply to your chat:</p>'
         . $bubbles
         . $button
-        . '<p dir="auto" style="margin:24px 0 0;color:#71717a;font-size:12px">يمكنك الرد على هذا البريد مباشرة | You can reply to this email directly.</p>'
+        . '<p dir="auto" style="margin:24px 0 0;color:#71717a;font-size:12px">للرد، افتح المحادثة من الزر أعلاه | To reply, open the chat with the button above.</p>'
         . '</div></body></html>';
 
     $pendingMails[] = [

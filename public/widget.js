@@ -44,10 +44,25 @@
   base.transition = 'width .2s ease, height .2s ease, border-radius .2s ease';
 
   var iframe = document.createElement('iframe');
+  // "Open the chat" links in reply emails carry ?lf_chat=<token>: hand it to the chat (which reopens that
+  // conversation) and drop it from the address bar so it is not shared by accident.
+  var resumeToken = null;
+  try {
+    var pageUrl = new URL(window.location.href);
+    resumeToken = pageUrl.searchParams.get('lf_chat');
+    if (resumeToken) {
+      pageUrl.searchParams.delete('lf_chat');
+      window.history.replaceState(window.history.state, '', pageUrl.toString());
+    }
+  } catch (e) {
+    resumeToken = null;
+  }
+
   // The chat runs on another origin, so tell it which page the visitor is on (shown to agents, linked in reply emails).
   iframe.src = appOrigin + '/?mode=widget&widgetId=' + encodeURIComponent(widgetId) +
     '&page=' + encodeURIComponent(window.location.href.slice(0, 500)) +
-    '&ref=' + encodeURIComponent(document.referrer.slice(0, 500));
+    '&ref=' + encodeURIComponent(document.referrer.slice(0, 500)) +
+    (resumeToken ? '&resume=' + encodeURIComponent(resumeToken) : '');
   iframe.title = 'Live chat';
   iframe.setAttribute('allowtransparency', 'true');
   iframe.allow = 'autoplay; clipboard-write';
