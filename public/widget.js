@@ -44,7 +44,10 @@
   base.transition = 'width .2s ease, height .2s ease, border-radius .2s ease';
 
   var iframe = document.createElement('iframe');
-  iframe.src = appOrigin + '/?mode=widget&widgetId=' + encodeURIComponent(widgetId);
+  // The chat runs on another origin, so tell it which page the visitor is on (shown to agents, linked in reply emails).
+  iframe.src = appOrigin + '/?mode=widget&widgetId=' + encodeURIComponent(widgetId) +
+    '&page=' + encodeURIComponent(window.location.href.slice(0, 500)) +
+    '&ref=' + encodeURIComponent(document.referrer.slice(0, 500));
   iframe.title = 'Live chat';
   iframe.setAttribute('allowtransparency', 'true');
   iframe.allow = 'autoplay; clipboard-write';

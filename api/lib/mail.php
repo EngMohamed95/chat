@@ -1,11 +1,21 @@
 <?php
 /**
- * Emails an agent's reply to a visitor who has left the website, so a question
- * asked and abandoned still gets its answer.
+ * Emails agent replies to visitors who left the website without reading them,
+ * so a question asked and abandoned still gets its answer.
+ *
+ * Each public agent reply schedules its conversation in the mail queue. The
+ * queue is checked whenever anyone polls (agents poll constantly while the
+ * dashboard is open): once a reply is due, it is emailed if the visitor has
+ * not read it and is no longer on the site; if they are still there, it is
+ * checked again a minute later.
  */
 
 /** A visitor counts as still on the site while its widget has polled within this many seconds. */
 const VISITOR_ONLINE_SECONDS = 30;
+/** How long to wait for a visitor who is still on the site to read a reply before checking again. */
+const MAIL_RECHECK_SECONDS = 60;
+/** Unread replies older than this are no longer emailed. */
+const MAIL_GIVE_UP_SECONDS = 24 * 3600;
 
 /** @var array<int, array{to:string,subject:string,html:string,from:string,fromName:string}> */
 $pendingMails = [];
@@ -38,22 +48,82 @@ function mail_safe_link(string $url, string $sender): string
     return $host === $domain || substr($host, -strlen($suffix)) === $suffix ? $url : '';
 }
 
-/** Queues the reply email when the conversation has an email address and the visitor is not on the site. */
-function queue_reply_email(array $conv, array $msg, array $settings, array $visitorSeen): void
+function visitor_is_online(array $visitorSeen, string $visitorId): bool
+{
+    return time() - (int)($visitorSeen[$visitorId] ?? 0) <= VISITOR_ONLINE_SECONDS;
+}
+
+/** Puts a conversation in the mail queue after an agent's public reply. */
+function schedule_reply_email(Store $store, array $conv, array $msg, array $visitorSeen): void
+{
+    if (!filter_var(trim((string)($conv['visitor_contact'] ?? '')), FILTER_VALIDATE_EMAIL)) return;
+    $queue = $store->readSide('mail_queue');
+    $due = visitor_is_online($visitorSeen, $conv['visitor_id']) ? time() + MAIL_RECHECK_SECONDS : time();
+    $entry = $queue[$conv['id']] ?? ['since' => $msg['created_at'], 'due' => $due];
+    $entry['due'] = min((int)$entry['due'], $due);
+    $queue[$conv['id']] = $entry;
+    $store->writeSide('mail_queue', $queue);
+}
+
+/** Emails the due conversations whose visitors left without reading the replies. */
+function process_mail_queue(Store $store): void
+{
+    $queue = $store->readSide('mail_queue');
+    if (!$queue) return;
+    $now = time();
+    $due = array_filter($queue, function ($e) use ($now) { return (int)$e['due'] <= $now; });
+    if (!$due) return;
+    // Loaded only when something is due: visitors poll often and the queue is usually empty.
+    $db = $store->db();
+
+    $visitorSeen = $store->readSide('visitors');
+    $convs = [];
+    foreach ($db['conversations'] as $c) if (isset($due[$c['id']])) $convs[$c['id']] = $c;
+
+    foreach ($due as $convId => $entry) {
+        $conv = $convs[$convId] ?? null;
+        $unread = [];
+        if ($conv) {
+            foreach ($db['messages'] as $m) {
+                if ($m['conversation_id'] === $convId && $m['sender_type'] === 'agent' && empty($m['is_internal_note'])
+                    && empty($m['seen']) && strcmp($m['created_at'], $entry['since']) >= 0) {
+                    $unread[] = $m;
+                }
+            }
+        }
+        $tooOld = $now - strtotime($entry['since']) > MAIL_GIVE_UP_SECONDS;
+        if (!$unread || $tooOld) {
+            unset($queue[$convId]);
+        } elseif (visitor_is_online($visitorSeen, $conv['visitor_id'])) {
+            // Still on the site: they may yet read it in the chat.
+            $queue[$convId]['due'] = $now + MAIL_RECHECK_SECONDS;
+        } else {
+            usort($unread, function ($a, $b) { return strcmp($a['created_at'], $b['created_at']); });
+            queue_reply_email($conv, $unread, $db['settings']);
+            unset($queue[$convId]);
+        }
+    }
+    $store->writeSide('mail_queue', $queue);
+}
+
+/** @param array[] $messages unread agent replies, oldest first */
+function queue_reply_email(array $conv, array $messages, array $settings): void
 {
     global $pendingMails;
     $to = trim((string)($conv['visitor_contact'] ?? ''));
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return;
-    $seen = (int)($visitorSeen[$conv['visitor_id']] ?? 0);
-    if (time() - $seen <= VISITOR_ONLINE_SECONDS) return;
 
     $company = (string)($settings['company_name'] ?? 'Support');
     $name = (string)($conv['visitor_name'] ?? '');
     $from = mail_sender($settings);
     $link = mail_safe_link((string)($conv['metadata']['current_url'] ?? ''), $from);
     $color = preg_match('/^#[0-9a-f]{3,8}$/i', (string)($settings['primary_color'] ?? '')) ? $settings['primary_color'] : '#10b981';
-    $body = $msg['content'] !== '' ? nl2br(mail_escape($msg['content'])) : '📎 Attachment / مرفق';
 
+    $bubbles = '';
+    foreach ($messages as $msg) {
+        $text = $msg['content'] !== '' ? nl2br(mail_escape($msg['content'])) : '📎 Attachment / مرفق';
+        $bubbles .= '<div dir="auto" style="background:#f4f4f5;border-radius:8px;padding:14px 16px;font-size:15px;line-height:1.6;margin:0 0 8px">' . $text . '</div>';
+    }
     $button = $link === '' ? '' :
         '<p style="margin:24px 0 0"><a href="' . mail_escape($link) . '" style="background:' . $color . ';color:#fff;text-decoration:none;'
         . 'padding:10px 20px;border-radius:8px;display:inline-block;font-weight:bold">تابع المحادثة | Continue the chat</a></p>';
@@ -63,7 +133,7 @@ function queue_reply_email(array $conv, array $msg, array $settings, array $visi
         . '<h2 style="margin:0 0 16px;font-size:18px">' . mail_escape($company) . '</h2>'
         . '<p dir="auto" style="margin:0 0 12px">' . ($name !== '' ? 'مرحباً ' . mail_escape($name) . ' | Hello ' . mail_escape($name) : 'مرحباً | Hello') . '</p>'
         . '<p dir="auto" style="margin:0 0 8px;color:#52525b;font-size:13px">لديك رد جديد على محادثتك | You have a new reply to your chat:</p>'
-        . '<div dir="auto" style="background:#f4f4f5;border-radius:8px;padding:14px 16px;font-size:15px;line-height:1.6">' . $body . '</div>'
+        . $bubbles
         . $button
         . '<p dir="auto" style="margin:24px 0 0;color:#71717a;font-size:12px">يمكنك الرد على هذا البريد مباشرة | You can reply to this email directly.</p>'
         . '</div></body></html>';

@@ -448,6 +448,7 @@ function route(string $method, string $path)
         } else {
             update_visitor_presence($auth['visitorId']);
         }
+        process_mail_queue($store);
         return $result;
     }
 
@@ -787,7 +788,8 @@ function route(string $method, string $path)
             publish('staff', 'message_created', $msg);
             if (!$msg['is_internal_note']) publish('visitor:' . $result['visitor_id'], 'message_created', $msg);
             if ($isAgent && !$msg['is_internal_note']) {
-                queue_reply_email($result, $msg, db()['settings'], $store->readSide('visitors'));
+                schedule_reply_email($store, $result, $msg, $store->readSide('visitors'));
+                process_mail_queue($store);
             }
             publish_conversation($result);
             return $msg;

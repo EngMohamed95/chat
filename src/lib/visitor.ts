@@ -20,15 +20,20 @@ export function getVisitorMetadata(): VisitorMetadata {
   if (/Mobi|Android|iPhone/i.test(ua)) device = 'Mobile';
   else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
 
+  // Inside the website's iframe, widget.js passes the host page and its referrer in the URL.
+  const params = new URLSearchParams(window.location.search);
+  const hostPage = params.get('page') || window.location.href;
+  const hostReferrer = params.has('page') ? params.get('ref') || '' : document.referrer;
+
   let referrer = '';
   try {
-    referrer = document.referrer ? new URL(document.referrer).hostname : 'Direct Visit';
+    referrer = hostReferrer ? new URL(hostReferrer).hostname : 'Direct Visit';
   } catch {
     referrer = 'Direct Visit';
   }
 
   return {
-    current_url: typeof window !== 'undefined' ? window.location.pathname || '/' : '/',
+    current_url: hostPage,
     referrer: referrer || 'Direct Visit',
     browser,
     os,
