@@ -875,6 +875,7 @@ function route(string $method, string $path)
             'fromName' => $company,
         ]);
         return $result + [
+            'recent' => array_reverse($store->readSide('mail_log')),
             'from' => $from,
             'php_version' => PHP_VERSION,
             'sendmail_path' => (string)ini_get('sendmail_path'),
@@ -934,13 +935,13 @@ try {
     $status = 500;
 }
 
+// Reply emails go out before the response (some hosts stop PHP once it has answered), but with the data lock
+// released so a slow mail server only delays the agent who sent the reply.
+if ($status === 200 && $pendingMails) {
+    $store->unlock();
+    send_pending_mails($store);
+}
+
 http_response_code($status);
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
-
-// Reply emails go out after the response, with the data lock released, so a slow mail server delays nobody.
-if ($status === 200 && $pendingMails) {
-    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
-    if ($store) $store->unlock();
-    send_pending_mails();
-}

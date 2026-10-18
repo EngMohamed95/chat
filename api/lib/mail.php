@@ -113,10 +113,17 @@ function send_mail(array $m): array
     return ['sent' => $sent, 'error' => $error];
 }
 
-/** Sends the queued emails. Runs after the response is sent and the data lock is released. */
-function send_pending_mails(): void
+/** Sends the queued emails and records each outcome in data/mail_log.json (the last 30). */
+function send_pending_mails(Store $store): void
 {
     global $pendingMails;
-    foreach ($pendingMails as $m) send_mail($m);
+    $results = [];
+    foreach ($pendingMails as $m) {
+        $r = send_mail($m);
+        $results[] = ['at' => now_iso(), 'to' => $m['to'], 'sent' => $r['sent'], 'error' => $r['error']];
+    }
     $pendingMails = [];
+    $log = array_slice(array_merge($store->readSide('mail_log'), $results), -30);
+    $store->writeSide('mail_log', $log);
+    $store->unlock();
 }
