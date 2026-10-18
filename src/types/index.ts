@@ -24,6 +24,8 @@ export interface Settings {
   primary_color: string;
   welcome_message: string;
   offline_message: string;
+  /** Sender and Reply-To of reply emails sent to visitors who left the site. */
+  notification_email?: string | null;
   working_hours: WorkingHours;
   widget_position: 'bottom-right' | 'bottom-left';
   prechat_enabled: boolean;

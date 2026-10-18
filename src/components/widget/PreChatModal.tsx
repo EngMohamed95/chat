@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { User, Mail, MessageSquare, ArrowRight } from 'lucide-react';
 import { isArabic } from '../../lib/rtl';
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface PreChatModalProps {
   companyName: string;
   welcomeMessage: string;
@@ -27,8 +29,8 @@ export const PreChatModal: React.FC<PreChatModalProps> = ({
       setError('Please provide your name');
       return;
     }
-    if (!contact.trim()) {
-      setError('Please provide your email or phone number');
+    if (!EMAIL_PATTERN.test(contact.trim())) {
+      setError('Please enter a valid email address');
       return;
     }
     setError('');
@@ -88,19 +90,21 @@ export const PreChatModal: React.FC<PreChatModalProps> = ({
 
         <div>
           <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1">
-            Email or Phone Number *
+            Email *
           </label>
           <div className="relative">
             <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
-              type="text"
+              type="email"
               required
+              dir="ltr"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
-              placeholder="e.g. alex@company.com or +966 50..."
+              placeholder="e.g. alex@company.com"
               className="w-full text-xs pl-9 pr-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400"
             />
           </div>
+          <p className="text-[11px] text-zinc-400 mt-1">If you leave the page, we will email you our reply.</p>
         </div>
 
         <div>

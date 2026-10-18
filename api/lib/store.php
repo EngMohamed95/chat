@@ -35,6 +35,15 @@ final class Store
         }
     }
 
+    /** Lets other requests in; nothing may be read or written through this store afterwards. */
+    public function unlock(): void
+    {
+        if (!$this->lock) return;
+        flock($this->lock, LOCK_UN);
+        fclose($this->lock);
+        $this->lock = null;
+    }
+
     /** Takes the lock for the rest of the request; released automatically when PHP exits. */
     public function lock(): void
     {
@@ -204,6 +213,7 @@ final class Store
             'primary_color' => '#10b981',
             'welcome_message' => 'Hi there! 👋 Welcome to our site. How can our team help you today?',
             'offline_message' => 'We are currently offline. Please drop your email and inquiry, and we will reply as soon as we are back!',
+            'notification_email' => null,
             'working_hours' => ['enabled' => true, 'start' => '09:00', 'end' => '18:00', 'timezone' => 'UTC'],
             'widget_position' => 'bottom-right',
             'prechat_enabled' => true,

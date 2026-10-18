@@ -30,6 +30,7 @@ export const SettingsPage: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState(settings.primary_color || '#10b981');
   const [welcomeMessage, setWelcomeMessage] = useState(settings.welcome_message);
   const [offlineMessage, setOfflineMessage] = useState(settings.offline_message);
+  const [notificationEmail, setNotificationEmail] = useState(settings.notification_email || '');
   const [widgetPosition, setWidgetPosition] = useState(settings.widget_position || 'bottom-right');
   const [prechatEnabled, setPrechatEnabled] = useState(settings.prechat_enabled);
   const [workingHoursEnabled, setWorkingHoursEnabled] = useState(settings.working_hours?.enabled ?? true);
@@ -52,6 +53,7 @@ export const SettingsPage: React.FC = () => {
         primary_color: primaryColor,
         welcome_message: welcomeMessage,
         offline_message: offlineMessage,
+        notification_email: notificationEmail.trim() || null,
         widget_position: widgetPosition,
         prechat_enabled: prechatEnabled,
         working_hours: {
@@ -230,6 +232,24 @@ export const SettingsPage: React.FC = () => {
               onChange={(e) => setOfflineMessage(e.target.value)}
               className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 dark:text-zinc-100 resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1">
+              Reply notification email
+            </label>
+            <input
+              type="email"
+              dir="ltr"
+              value={notificationEmail}
+              onChange={(e) => setNotificationEmail(e.target.value)}
+              placeholder="support@your-domain.com"
+              className="w-full text-xs px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-zinc-800 dark:text-zinc-100"
+            />
+            <p className="text-[11px] text-zinc-400 mt-1">
+              When a visitor has left the website, agent replies are emailed to them from this address, and their email
+              replies come back to it. It must be a mailbox on your hosting.
+            </p>
           </div>
 
           {/* Pre-Chat Form Toggle */}

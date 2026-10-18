@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/lib/store.php';
 require __DIR__ . '/lib/analytics.php';
+require __DIR__ . '/lib/mail.php';
 
 const AGENT_SESSION_MAX_IDLE = 30 * 24 * 3600;
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -329,6 +330,18 @@ function update_presence(string $userId, ?bool $away = null): void
     $store->writeSide('presence', $presence);
 }
 
+/** Remembers when each visitor's widget last polled, so replies are emailed only to visitors who left. */
+function update_visitor_presence(string $visitorId): void
+{
+    global $store;
+    $seen = $store->readSide('visitors');
+    if (time() - (int)($seen[$visitorId] ?? 0) < 10) return;
+    $cutoff = time() - 3600;
+    $seen = array_filter($seen, function ($t) use ($cutoff) { return $t >= $cutoff; });
+    $seen[$visitorId] = time();
+    $store->writeSide('visitors', $seen);
+}
+
 // --- Login throttling ------------------------------------------------------------
 
 function throttle_key(string $username): string
@@ -432,6 +445,8 @@ function route(string $method, string $path)
         if ($isAgent) {
             update_presence($auth['user']['id']);
             $result['onlineAgents'] = online_agent_ids();
+        } else {
+            update_visitor_presence($auth['visitorId']);
         }
         return $result;
     }
@@ -594,6 +609,11 @@ function route(string $method, string $path)
         }
         if (array_key_exists('welcome_message', $b)) $s['welcome_message'] = text($b['welcome_message'], 'Welcome message', 1000) ?? '';
         if (array_key_exists('offline_message', $b)) $s['offline_message'] = text($b['offline_message'], 'Offline message', 1000) ?? '';
+        if (array_key_exists('notification_email', $b)) {
+            $email = text($b['notification_email'], 'Notification email', 200);
+            if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new HttpError(400, 'Notification email is not a valid email address');
+            $s['notification_email'] = $email;
+        }
         if (array_key_exists('widget_position', $b)) $s['widget_position'] = $b['widget_position'] === 'bottom-left' ? 'bottom-left' : 'bottom-right';
         if (array_key_exists('prechat_enabled', $b)) $s['prechat_enabled'] = (bool)$b['prechat_enabled'];
         if (array_key_exists('working_hours', $b)) {
@@ -641,12 +661,17 @@ function route(string $method, string $path)
             if (isset($rawMeta[$key]) && is_string($rawMeta[$key])) $metadata[$key] = usubstr($rawMeta[$key], 500);
         }
         $metadata['ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
+        $contact = text($b['visitor_contact'] ?? null, 'Email', 200);
+        // The pre-chat form asks for an email so replies can reach visitors who leave the site.
+        if (!empty(db()['settings']['prechat_enabled']) && ($contact === null || !filter_var($contact, FILTER_VALIDATE_EMAIL))) {
+            throw new HttpError(400, 'Please enter a valid email address');
+        }
         $now = now_iso();
         $conv = [
             'id' => new_id('conv'),
             'visitor_id' => $auth['visitorId'],
             'visitor_name' => text($b['visitor_name'] ?? null, 'Name', 100) ?? 'Visitor #' . substr($auth['visitorId'], -4),
-            'visitor_contact' => text($b['visitor_contact'] ?? null, 'Contact', 200),
+            'visitor_contact' => $contact,
             'status' => 'open',
             'assigned_to' => null,
             'last_message' => 'Started a conversation',
@@ -761,6 +786,9 @@ function route(string $method, string $path)
             unset($conv);
             publish('staff', 'message_created', $msg);
             if (!$msg['is_internal_note']) publish('visitor:' . $result['visitor_id'], 'message_created', $msg);
+            if ($isAgent && !$msg['is_internal_note']) {
+                queue_reply_email($result, $msg, db()['settings'], $store->readSide('visitors'));
+            }
             publish_conversation($result);
             return $msg;
         }
@@ -873,3 +901,10 @@ try {
 http_response_code($status);
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+
+// Reply emails go out after the response, with the data lock released, so a slow mail server delays nobody.
+if ($status === 200 && $pendingMails) {
+    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+    if ($store) $store->unlock();
+    send_pending_mails();
+}
