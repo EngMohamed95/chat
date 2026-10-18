@@ -1,7 +1,7 @@
 import { Conversation, Message, Profile, Settings, CannedReply, AnalyticsSummary } from '../types';
 
 /**
- * Client for the LiveFlow server (server/index.ts).
+ * Client for the LiveFlow server (api/index.php).
  *
  * Two kinds of callers share this module: staff in the dashboard ("agent") and
  * customers in the chat widget ("visitor"). Each has its own token, so the same
@@ -49,7 +49,16 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const token = options.as ? getToken(options.as) : null;
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+    // Some PHP hosts drop the Authorization header; the server also reads this one.
+    headers['X-LiveFlow-Auth'] = `Bearer ${token}`;
+  }
+  // Shared hosting firewalls often block PUT/PATCH/DELETE, so they travel as POST.
+  if (method !== 'GET' && method !== 'POST') {
+    headers['X-HTTP-Method-Override'] = method;
+    method = 'POST';
+  }
 
   let body: BodyInit | undefined;
   if (options.raw) {
@@ -73,37 +82,55 @@ async function request<T>(
 }
 
 // -----------------------------------------------------------------------------
-// Realtime: one Server-Sent Events stream per audience
+// Realtime: each audience polls GET /api/events for what happened since its
+// last poll (shared PHP hosting cannot keep streaming connections open).
 // -----------------------------------------------------------------------------
 
 type Listener = (data: any) => void;
 
+interface EventsResponse {
+  seq: number;
+  events: { type: string; data: unknown }[];
+  resync: boolean;
+  onlineAgents?: string[];
+}
+
+const POLL_VISIBLE_MS = 2500;
+const POLL_HIDDEN_MS = 10000;
+
 const settingsListeners = new Set<(s: Settings) => void>();
 
 class RealtimeConnection {
-  private source: EventSource | null = null;
   private listeners = new Map<string, Set<Listener>>();
-  private connectedBefore = false;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private seq: number | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private polling = false;
+  private lastPresence = '';
+  /** Set after a failed poll: views refetch once polling works again. */
+  private missedPolls = false;
+  /** Bumped by reset() so a poll that was in flight for the old token is ignored. */
+  private generation = 0;
 
   constructor(private readonly audience: Audience) {}
 
   subscribe(type: string, cb: Listener): () => void {
     if (!this.listeners.has(type)) this.listeners.set(type, new Set());
     this.listeners.get(type)!.add(cb);
-    this.connect();
+    this.start();
     return () => {
       this.listeners.get(type)?.delete(cb);
     };
   }
 
-  /** Close the stream; the next subscribe() reconnects with the current token. */
+  /** Stop polling; the next subscribe() starts again with the current token. */
   reset() {
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = null;
-    this.source?.close();
-    this.source = null;
-    this.connectedBefore = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.polling = false;
+    this.seq = null;
+    this.lastPresence = '';
+    this.missedPolls = false;
+    this.generation++;
   }
 
   private emit(type: string, data: unknown) {
@@ -116,35 +143,71 @@ class RealtimeConnection {
     });
   }
 
-  private connect() {
-    if (this.source) return;
-    const token = getToken(this.audience);
-    if (!token) return;
-
-    const source = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
-    source.onopen = () => {
-      // After a dropped connection, tell views to refetch what they may have missed.
-      if (this.connectedBefore) this.emit('resync', null);
-      this.connectedBefore = true;
-    };
-    source.onmessage = (event) => {
-      try {
-        const { type, data } = JSON.parse(event.data);
-        this.emit(type, data);
-        if (type === 'settings_updated') settingsListeners.forEach((cb) => cb(data));
-      } catch {
-        // Ignore malformed frames
-      }
-    };
-    source.onerror = () => {
-      // The browser retries network errors itself; CLOSED means it gave up (e.g. 401).
-      if (source.readyState === EventSource.CLOSED) {
-        this.source = null;
-        this.retryTimer = setTimeout(() => this.connect(), 5000);
-      }
-    };
-    this.source = source;
+  private start() {
+    if (this.polling || !getToken(this.audience)) return;
+    this.polling = true;
+    this.poll();
   }
+
+  /** Poll now if a poll is waiting on its timer. */
+  wake() {
+    if (!this.timer) return;
+    clearTimeout(this.timer);
+    this.poll();
+  }
+
+  private schedule(delay?: number) {
+    const hidden = typeof document !== 'undefined' && document.hidden;
+    this.timer = setTimeout(() => this.poll(), delay ?? (hidden ? POLL_HIDDEN_MS : POLL_VISIBLE_MS));
+  }
+
+  private async poll() {
+    this.timer = null;
+    const generation = this.generation;
+    if (!getToken(this.audience)) {
+      this.polling = false;
+      return;
+    }
+    try {
+      const since = this.seq === null ? '' : String(this.seq);
+      const res = await request<EventsResponse>('GET', `/api/events?since=${since}`, { as: this.audience });
+      if (generation !== this.generation) return;
+      // Fell too far behind, the server was reset, or earlier polls failed: views refetch everything.
+      if (res.resync || this.missedPolls) this.emit('resync', null);
+      this.missedPolls = false;
+      for (const { type, data } of res.events) {
+        this.emit(type, data);
+        if (type === 'settings_updated') settingsListeners.forEach((cb) => cb(data as Settings));
+      }
+      if (res.onlineAgents) {
+        const key = [...res.onlineAgents].sort().join(',');
+        if (key !== this.lastPresence) {
+          this.lastPresence = key;
+          this.emit('presence_state', { onlineAgents: res.onlineAgents });
+        }
+      }
+      this.seq = res.seq;
+      this.schedule();
+    } catch (err) {
+      if (generation !== this.generation) return;
+      if (err instanceof ApiError && err.status === 401) {
+        this.polling = false;
+        return;
+      }
+      // Network hiccup: keep our place in the event log and back off; resync once a poll succeeds.
+      this.missedPolls = true;
+      this.schedule(POLL_HIDDEN_MS);
+    }
+  }
+}
+
+// Poll right away when the tab comes back, instead of waiting out the slow hidden interval.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      for (const conn of [realtime.agent, realtime.visitor]) conn.wake();
+    }
+  });
 }
 
 const realtime: Record<Audience, RealtimeConnection> = {

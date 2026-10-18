@@ -1,0 +1,31 @@
+# LiveFlow on Apache + PHP hosting.
+# /api/* and /uploads/* go to api/index.php; everything else is the built frontend.
+DirectoryIndex index.html
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # PHP under CGI/FPM does not see the Authorization header unless it is passed on.
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # Never serve a data folder (database, uploads) that ended up inside the site folder.
+  RewriteRule ^data(/|$) - [F]
+
+  RewriteRule ^(api|uploads)(/|$) api/index.php [L,QSA]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  # The page itself must always be fresh; built assets have hashed names and can be cached.
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "^widget\.js$">
+    Header set Cache-Control "max-age=300"
+  </FilesMatch>
+</IfModule>

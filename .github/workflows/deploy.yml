@@ -1,11 +1,12 @@
-# Builds the app on every push to main and uploads a ready-to-run copy to the
-# hosting server over FTP. The hosting panel runs the Node app from that folder.
+# Builds the app on every push to main and uploads it to the hosting over FTP.
+# The site runs on plain Apache + PHP: the built frontend and api/ go into the
+# site folder; the data lives outside it in ~/liveflow-data (never uploaded).
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
 #   FTP_SERVER    FTP hostname
 #   FTP_USERNAME  FTP account username
 #   FTP_PASSWORD  FTP account password
-#   FTP_DIR       optional, app folder as seen by the FTP account, defaults to ./
+#   FTP_DIR       optional, site folder as seen by the FTP account, defaults to ./
 # Until FTP_SERVER is set, the build still runs and the upload is skipped.
 name: Build & Deploy
 
@@ -34,25 +35,16 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - name: Check PHP syntax
+        run: find api -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Assemble deploy package
         run: |
           mkdir release
-          cp -r dist server-dist release/
-          # express is bundled into server-dist, so there is nothing to npm install.
-          cat > release/package.json <<'JSON'
-          {
-            "name": "liveflow",
-            "private": true,
-            "type": "module",
-            "main": "server-dist/index.mjs",
-            "engines": { "node": ">=20.11" },
-            "scripts": { "start": "node server-dist/index.mjs" }
-          }
-          JSON
-          # The server exits when tmp/restart.txt changes, and the host restarts it.
-          mkdir -p release/tmp
-          date -u > release/tmp/restart.txt
+          cp -r dist/. release/
+          cp -r api release/api
+          # The site's .htaccess switches routing to the new build, so it is uploaded last.
+          mv release/.htaccess site.htaccess
 
       - name: Skip upload (FTP_SERVER not configured)
         if: env.FTP_SERVER == ''
@@ -68,14 +60,18 @@ jobs:
           sudo apt-get install -y -qq lftp
           # Shared-hosting FTP certificates are issued for the server name, not
           # the account's domain, so TLS is used without verifying the hostname.
+          # Old build assets are removed so stale hashed files do not pile up;
+          # leftovers of the earlier Node.js deployment are removed once.
           lftp --env-password -u "$FTP_USERNAME" "$FTP_SERVER" <<EOF
           set ftp:ssl-allow yes
           set ssl:verify-certificate no
           set net:timeout 20
           set net:max-retries 3
           set net:reconnect-interval-base 5
-          mirror --reverse --verbose --parallel=1 --exclude tmp/ release/ "$FTP_DIR"
-          mkdir -p -f "$FTP_DIR/tmp"
-          put release/tmp/restart.txt -o "$FTP_DIR/tmp/restart.txt"
+          mirror --reverse --verbose --parallel=1 release/ "$FTP_DIR"
+          mirror --reverse --verbose --delete release/assets/ "$FTP_DIR/assets"
+          rm -r -f "$FTP_DIR/dist" "$FTP_DIR/server-dist" "$FTP_DIR/tmp"
+          rm -f "$FTP_DIR/start.sh" "$FTP_DIR/package.json"
+          put site.htaccess -o "$FTP_DIR/.htaccess"
           bye
           EOF
