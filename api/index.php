@@ -802,6 +802,8 @@ function route(string $method, string $path)
             if (!$msg['is_internal_note']) publish('visitor:' . $result['visitor_id'], 'message_created', $msg);
             if ($isAgent && !$msg['is_internal_note']) {
                 queue_reply_email($result, [$msg], db()['settings']);
+            } elseif (!$isAgent) {
+                queue_staff_notification($result, $msg, db()['settings']);
             }
             publish_conversation($result);
             return $msg;

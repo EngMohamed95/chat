@@ -1,7 +1,8 @@
 <?php
 /**
- * Emails every public agent reply to the visitor as well, so a visitor who
- * closed the website still gets the answer.
+ * Chat by email: every public agent reply is also emailed to the visitor (so
+ * one who closed the website still gets the answer), and every visitor
+ * message is emailed to the support mailbox from Settings.
  */
 
 /** @var array<int, array{to:string,subject:string,html:string,from:string,fromName:string}> */
@@ -79,9 +80,45 @@ function queue_reply_email(array $conv, array $messages, array $settings): void
     ];
 }
 
+/** Notifies the support mailbox (Settings > Reply notification email) of a visitor's message. */
+function queue_staff_notification(array $conv, array $msg, array $settings): void
+{
+    global $pendingMails;
+    $to = (string)($settings['notification_email'] ?? '');
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return;
+
+    $name = (string)($conv['visitor_name'] ?? 'Visitor');
+    $contact = trim((string)($conv['visitor_contact'] ?? ''));
+    $page = mail_safe_link((string)($conv['metadata']['current_url'] ?? ''), $to);
+    // Link to this dashboard, only when the request came in on the support mailbox's own domain.
+    $dashboard = mail_safe_link('https://' . strtolower((string)($_SERVER['HTTP_HOST'] ?? '')) . '/', $to);
+    $color = preg_match('/^#[0-9a-f]{3,8}$/i', (string)($settings['primary_color'] ?? '')) ? $settings['primary_color'] : '#10b981';
+    $text = $msg['content'] !== '' ? nl2br(mail_escape($msg['content'])) : '📎 Attachment / مرفق';
+
+    $html = '<!doctype html><html><body style="margin:0;padding:24px;background:#f4f4f5;font-family:Tahoma,Arial,sans-serif">'
+        . '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;color:#18181b">'
+        . '<p dir="auto" style="margin:0 0 4px;font-size:16px;font-weight:bold">' . mail_escape($name) . '</p>'
+        . '<p style="margin:0 0 12px;color:#71717a;font-size:13px" dir="ltr">' . mail_escape($contact)
+        . ($page !== '' ? ' · <a href="' . mail_escape($page) . '" style="color:#71717a">' . mail_escape($page) . '</a>' : '') . '</p>'
+        . '<div dir="auto" style="background:#f4f4f5;border-radius:8px;padding:14px 16px;font-size:15px;line-height:1.6">' . $text . '</div>'
+        . ($dashboard === '' ? '' : '<p style="margin:24px 0 0"><a href="' . mail_escape($dashboard) . '" style="background:' . $color
+            . ';color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;display:inline-block;font-weight:bold">افتح لوحة الشات | Open the chat dashboard</a></p>')
+        . '</div></body></html>';
+
+    $pendingMails[] = [
+        'to' => $to,
+        'subject' => "رسالة جديدة من $name | New chat message",
+        'html' => $html,
+        'from' => $to,
+        'fromName' => (string)($settings['company_name'] ?? 'Live chat'),
+        // Replying to the notification writes to the visitor directly.
+        'replyTo' => filter_var($contact, FILTER_VALIDATE_EMAIL) ? $contact : $to,
+    ];
+}
+
 /**
  * Sends one email with PHP's mail().
- * @param array{to:string,subject:string,html:string,from:string,fromName:string} $m
+ * @param array{to:string,subject:string,html:string,from:string,fromName:string,replyTo?:string} $m
  * @return array{sent:bool,error:?string}
  */
 function send_mail(array $m): array
@@ -92,7 +129,7 @@ function send_mail(array $m): array
         'Content-Type: text/html; charset=UTF-8',
         'Content-Transfer-Encoding: base64',
         'From: ' . $encode($m['fromName']) . ' <' . $m['from'] . '>',
-        'Reply-To: ' . $m['from'],
+        'Reply-To: ' . ($m['replyTo'] ?? $m['from']),
     ]);
     $body = chunk_split(base64_encode($m['html']));
     $subject = $encode($m['subject']);
